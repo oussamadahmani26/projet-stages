@@ -1,0 +1,36 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>ma.inpt.soa</groupId>
+        <artifactId>projet-stages</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>integration-tests</artifactId>
+    <name>Tests de bout en bout (services réels, base MySQL dédiée)</name>
+    <dependencies>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>soap-etudiants</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>soap-entreprises</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>soap-offres</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>rest-candidatures</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>rest-notifications</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>rest-stages</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>ma.inpt.soa</groupId><artifactId>bpmn</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <!-- Module sans point d'entrée : pas de jar exécutable -->
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>jar-executable</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

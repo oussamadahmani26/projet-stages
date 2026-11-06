@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Processus d'orchestration d'une candidature à une offre de stage (BPMN 2.0 standard).
+     Les attributs flowable:* relient les tâches aux classes Java ; ils sont ignorés par les autres outils. -->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://soa.inpt.ma/processus">
+  <error id="erreurService" name="Erreur ou indisponibilité d'un service" errorCode="ERREUR_SERVICE"/>
+  <message id="msgAnnulation" name="annulationCandidature"/>
+  <process id="candidature" name="Traitement d'une candidature de stage" isExecutable="true">
+    <startEvent id="debut" name="Candidature soumise"/>
+    <subProcess id="sp_controles" name="Contrôles préalables">
+      <extensionElements><flowable:executionListener event="start" expression="${execution.setVariable('etapeEnErreur','CONTROLES')}"/></extensionElements>
+      <startEvent id="c_debut"/>
+      <serviceTask id="verifierEtudiant" name="Vérifier l'étudiant (SOAP)" flowable:class="ma.inpt.soa.processus.taches.VerifierEtudiant"></serviceTask>
+      <serviceTask id="verifierOffre" name="Vérifier offre et entreprise (SOAP)" flowable:class="ma.inpt.soa.processus.taches.VerifierOffre"></serviceTask>
+      <serviceTask id="controlerCandidature" name="Contrôler la candidature (REST)" flowable:class="ma.inpt.soa.processus.taches.ControlerCandidature"></serviceTask>
+      <endEvent id="c_fin"/>
+      <sequenceFlow id="f_c1" sourceRef="c_debut" targetRef="verifierEtudiant"/>
+      <sequenceFlow id="f_c2" sourceRef="verifierEtudiant" targetRef="verifierOffre"/>
+      <sequenceFlow id="f_c3" sourceRef="verifierOffre" targetRef="controlerCandidature"/>
+      <sequenceFlow id="f_c4" sourceRef="controlerCandidature" targetRef="c_fin"/>
+    </subProcess>
+    <exclusiveGateway id="gw_valide" name="Conditions satisfaites ?" default="f_valide_oui"/>
+    <serviceTask id="notifierRejet" name="Notifier le rejet (REST)" flowable:class="ma.inpt.soa.processus.taches.NotifierRejet"><extensionElements><flowable:executionListener event="start" expression="${execution.setVariable('etapeEnErreur','REJET')}"/></extensionElements></serviceTask>
+    <endEvent id="fin_rejetee" name="Candidature rejetée"/>
+    <subProcess id="sp_transmission" name="Enregistrement et transmission">
+      <extensionElements><flowable:executionListener event="start" expression="${execution.setVariable('etapeEnErreur','TRANSMISSION')}"/></extensionElements>
+      <startEvent id="t_debut"/>
+      <serviceTask id="enregistrer" name="Enregistrer la candidature (REST)" flowable:class="ma.inpt.soa.processus.taches.EnregistrerCandidature"></serviceTask>
+      <serviceTask id="confirmerDepot" name="Confirmer le dépôt (REST)" flowable:class="ma.inpt.soa.processus.taches.ConfirmerDepot"></serviceTask>
+      <serviceTask id="notifierEntreprise" name="Notifier l'entreprise (REST)" flowable:class="ma.inpt.soa.processus.taches.NotifierEntreprise"></serviceTask>
+      <serviceTask id="passerEvaluation" name="Passer en évaluation (REST)" flowable:class="ma.inpt.soa.processus.taches.PasserEnEvaluation"></serviceTask>
+      <endEvent id="t_fin"/>
+      <sequenceFlow id="f_t1" sourceRef="t_debut" targetRef="enregistrer"/>
+      <sequenceFlow id="f_t2" sourceRef="enregistrer" targetRef="confirmerDepot"/>
+      <sequenceFlow id="f_t3" sourceRef="confirmerDepot" targetRef="notifierEntreprise"/>
+      <sequenceFlow id="f_t4" sourceRef="notifierEntreprise" targetRef="passerEvaluation"/>
+      <sequenceFlow id="f_t5" sourceRef="passerEvaluation" targetRef="t_fin"/>
+    </subProcess>
+    <userTask id="decisionEntreprise" name="Décision de l'entreprise" flowable:candidateGroups="entreprise-${idEntreprise}"/>
+    <boundaryEvent id="b_annulation" name="Annulation" attachedToRef="decisionEntreprise" cancelActivity="true"><messageEventDefinition messageRef="msgAnnulation"/></boundaryEvent>
+    <serviceTask id="notifierAnnulation" name="Notifier l'annulation (REST)" flowable:class="ma.inpt.soa.processus.taches.NotifierAnnulation"></serviceTask>
+    <endEvent id="fin_annulee" name="Candidature annulée"/>
+    <exclusiveGateway id="gw_decision" name="Décision ?" default="f_dec_fin"/>
+    <serviceTask id="notifierComplement" name="Demander complément (REST)" flowable:class="ma.inpt.soa.processus.taches.NotifierComplement"><extensionElements><flowable:executionListener event="start" expression="${execution.setVariable('etapeEnErreur','COMPLEMENT')}"/></extensionElements></serviceTask>
+    <subProcess id="sp_cloture" name="Clôture de la candidature">
+      <extensionElements><flowable:executionListener event="start" expression="${execution.setVariable('etapeEnErreur','CLOTURE')}"/></extensionElements>
+      <startEvent id="k_debut"/>
+      <serviceTask id="confirmerDecision" name="Confirmer, réserver la place (SOAP)" flowable:class="ma.inpt.soa.processus.taches.ConfirmerDecision"></serviceTask>
+      <serviceTask id="majCandidature" name="Mettre à jour le statut (REST)" flowable:class="ma.inpt.soa.processus.taches.MettreAJourCandidature"></serviceTask>
+      <serviceTask id="notifierResultat" name="Notifier le résultat (REST)" flowable:class="ma.inpt.soa.processus.taches.NotifierResultat"></serviceTask>
+      <exclusiveGateway id="gw_acceptee" name="Acceptée ?" default="f_k_refus"/>
+      <serviceTask id="creerStage" name="Créer le dossier de stage (REST)" flowable:class="ma.inpt.soa.processus.taches.CreerDossierStage"></serviceTask>
+      <serviceTask id="majEtudiant" name="Statut étudiant : EN_STAGE (SOAP)" flowable:class="ma.inpt.soa.processus.taches.MettreAJourEtudiant"></serviceTask>
+      <endEvent id="k_fin"/>
+      <sequenceFlow id="f_k1" sourceRef="k_debut" targetRef="confirmerDecision"/>
+      <sequenceFlow id="f_k2" sourceRef="confirmerDecision" targetRef="majCandidature"/>
+      <sequenceFlow id="f_k3" sourceRef="majCandidature" targetRef="notifierResultat"/>
+      <sequenceFlow id="f_k4" sourceRef="notifierResultat" targetRef="gw_acceptee"/>
+      <sequenceFlow id="f_k_ok" sourceRef="gw_acceptee" targetRef="creerStage" name="Oui"><conditionExpression xsi:type="tFormalExpression">${decision == 'ACCEPTEE'}</conditionExpression></sequenceFlow>
+      <sequenceFlow id="f_k_refus" sourceRef="gw_acceptee" targetRef="k_fin" name="Non"/>
+      <sequenceFlow id="f_k5" sourceRef="creerStage" targetRef="majEtudiant"/>
+      <sequenceFlow id="f_k6" sourceRef="majEtudiant" targetRef="k_fin"/>
+    </subProcess>
+    <exclusiveGateway id="gw_fin" name="Résultat ?" default="f_fin_refus"/>
+    <endEvent id="fin_acceptee" name="Candidature acceptée"/>
+    <endEvent id="fin_refusee" name="Candidature refusée"/>
+    <boundaryEvent id="err_controles" name="Erreur service" attachedToRef="sp_controles" cancelActivity="true"><errorEventDefinition errorRef="erreurService"/></boundaryEvent>
+    <boundaryEvent id="err_rejet" name="Erreur service" attachedToRef="notifierRejet" cancelActivity="true"><errorEventDefinition errorRef="erreurService"/></boundaryEvent>
+    <boundaryEvent id="err_transmission" name="Erreur service" attachedToRef="sp_transmission" cancelActivity="true"><errorEventDefinition errorRef="erreurService"/></boundaryEvent>
+    <boundaryEvent id="err_complement" name="Erreur service" attachedToRef="notifierComplement" cancelActivity="true"><errorEventDefinition errorRef="erreurService"/></boundaryEvent>
+    <boundaryEvent id="err_cloture" name="Erreur service" attachedToRef="sp_cloture" cancelActivity="true"><errorEventDefinition errorRef="erreurService"/></boundaryEvent>
+    <userTask id="traiterIncident" name="Traiter l'incident (responsable)" flowable:candidateGroups="responsables"/>
+    <exclusiveGateway id="gw_action" name="Action ?" default="f_relancer"/>
+    <serviceTask id="compenser" name="Compenser et prévenir l'étudiant" flowable:class="ma.inpt.soa.processus.taches.CompenserAbandon"></serviceTask>
+    <endEvent id="fin_abandonnee" name="Traitement abandonné"/>
+    <exclusiveGateway id="gw_route" name="Reprendre à quelle étape ?" default="f_r_controles"/>
+    <sequenceFlow id="f_1" sourceRef="debut" targetRef="sp_controles" name="Dépôt"/>
+    <sequenceFlow id="f_2" sourceRef="sp_controles" targetRef="gw_valide"/>
+    <sequenceFlow id="f_valide_oui" sourceRef="gw_valide" targetRef="sp_transmission" name="Oui"/>
+    <sequenceFlow id="f_valide_non" sourceRef="gw_valide" targetRef="notifierRejet" name="Non"><conditionExpression xsi:type="tFormalExpression">${!valide}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_rejet_fin" sourceRef="notifierRejet" targetRef="fin_rejetee" name="Rejetée"/>
+    <sequenceFlow id="f_3" sourceRef="sp_transmission" targetRef="decisionEntreprise"/>
+    <sequenceFlow id="f_4" sourceRef="decisionEntreprise" targetRef="gw_decision"/>
+    <sequenceFlow id="f_annul1" sourceRef="b_annulation" targetRef="notifierAnnulation"/>
+    <sequenceFlow id="f_annul2" sourceRef="notifierAnnulation" targetRef="fin_annulee" name="Annulée"/>
+    <sequenceFlow id="f_dec_comp" sourceRef="gw_decision" targetRef="notifierComplement" name="Complément"><conditionExpression xsi:type="tFormalExpression">${decision == 'COMPLEMENT'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_comp_retour" sourceRef="notifierComplement" targetRef="decisionEntreprise"/>
+    <sequenceFlow id="f_dec_fin" sourceRef="gw_decision" targetRef="sp_cloture" name="Finale"/>
+    <sequenceFlow id="f_5" sourceRef="sp_cloture" targetRef="gw_fin"/>
+    <sequenceFlow id="f_fin_ok" sourceRef="gw_fin" targetRef="fin_acceptee" name="Acceptée"><conditionExpression xsi:type="tFormalExpression">${decision == 'ACCEPTEE'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_fin_refus" sourceRef="gw_fin" targetRef="fin_refusee" name="Refusée"/>
+    <sequenceFlow id="f_e1" sourceRef="err_controles" targetRef="traiterIncident"/>
+    <sequenceFlow id="f_e2" sourceRef="err_rejet" targetRef="traiterIncident"/>
+    <sequenceFlow id="f_e3" sourceRef="err_transmission" targetRef="traiterIncident"/>
+    <sequenceFlow id="f_e4" sourceRef="err_complement" targetRef="traiterIncident"/>
+    <sequenceFlow id="f_e5" sourceRef="err_cloture" targetRef="traiterIncident"/>
+    <sequenceFlow id="f_i1" sourceRef="traiterIncident" targetRef="gw_action"/>
+    <sequenceFlow id="f_abandon" sourceRef="gw_action" targetRef="compenser" name="Abandonner"><conditionExpression xsi:type="tFormalExpression">${action == 'ABANDONNER'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_i2" sourceRef="compenser" targetRef="fin_abandonnee" name="Abandonnée"/>
+    <sequenceFlow id="f_relancer" sourceRef="gw_action" targetRef="gw_route" name="Relancer"/>
+    <sequenceFlow id="f_r_controles" sourceRef="gw_route" targetRef="sp_controles" name="Contrôles"/>
+    <sequenceFlow id="f_r_rejet" sourceRef="gw_route" targetRef="notifierRejet" name="Rejet"><conditionExpression xsi:type="tFormalExpression">${etapeEnErreur == 'REJET'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_r_transmission" sourceRef="gw_route" targetRef="sp_transmission" name="Transmission"><conditionExpression xsi:type="tFormalExpression">${etapeEnErreur == 'TRANSMISSION'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_r_complement" sourceRef="gw_route" targetRef="notifierComplement" name="Complément"><conditionExpression xsi:type="tFormalExpression">${etapeEnErreur == 'COMPLEMENT'}</conditionExpression></sequenceFlow>
+    <sequenceFlow id="f_r_cloture" sourceRef="gw_route" targetRef="sp_cloture" name="Clôture"><conditionExpression xsi:type="tFormalExpression">${etapeEnErreur == 'CLOTURE'}</conditionExpression></sequenceFlow>
+  </process>
+  <bpmndi:BPMNDiagram id="diagramme">
+    <bpmndi:BPMNPlane id="plan" bpmnElement="candidature">
+      <bpmndi:BPMNShape id="s_debut" bpmnElement="debut"><omgdc:Bounds x="40" y="222" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="10" y="260" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_sp_controles" bpmnElement="sp_controles" isExpanded="true"><omgdc:Bounds x="110" y="150" width="600" height="180"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_c_debut" bpmnElement="c_debut"><omgdc:Bounds x="130" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_verifierEtudiant" bpmnElement="verifierEtudiant"><omgdc:Bounds x="190" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_verifierOffre" bpmnElement="verifierOffre"><omgdc:Bounds x="340" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_controlerCandidature" bpmnElement="controlerCandidature"><omgdc:Bounds x="490" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_c_fin" bpmnElement="c_fin"><omgdc:Bounds x="650" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_valide" bpmnElement="gw_valide"><omgdc:Bounds x="760" y="215" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="730" y="267" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_notifierRejet" bpmnElement="notifierRejet"><omgdc:Bounds x="725" y="380" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_fin_rejetee" bpmnElement="fin_rejetee"><omgdc:Bounds x="905" y="397" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="875" y="435" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_sp_transmission" bpmnElement="sp_transmission" isExpanded="true"><omgdc:Bounds x="860" y="150" width="710" height="180"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_t_debut" bpmnElement="t_debut"><omgdc:Bounds x="880" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_enregistrer" bpmnElement="enregistrer"><omgdc:Bounds x="930" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_confirmerDepot" bpmnElement="confirmerDepot"><omgdc:Bounds x="1070" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_notifierEntreprise" bpmnElement="notifierEntreprise"><omgdc:Bounds x="1210" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_passerEvaluation" bpmnElement="passerEvaluation"><omgdc:Bounds x="1350" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_t_fin" bpmnElement="t_fin"><omgdc:Bounds x="1510" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_decisionEntreprise" bpmnElement="decisionEntreprise"><omgdc:Bounds x="1620" y="205" width="130" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_b_annulation" bpmnElement="b_annulation"><omgdc:Bounds x="1667" y="187" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="1637" y="225" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_notifierAnnulation" bpmnElement="notifierAnnulation"><omgdc:Bounds x="1625" y="70" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_fin_annulee" bpmnElement="fin_annulee"><omgdc:Bounds x="1785" y="87" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="1755" y="125" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_decision" bpmnElement="gw_decision"><omgdc:Bounds x="1800" y="215" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="1770" y="267" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_notifierComplement" bpmnElement="notifierComplement"><omgdc:Bounds x="1625" y="350" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_sp_cloture" bpmnElement="sp_cloture" isExpanded="true"><omgdc:Bounds x="1900" y="60" width="820" height="360"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_k_debut" bpmnElement="k_debut"><omgdc:Bounds x="1920" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_confirmerDecision" bpmnElement="confirmerDecision"><omgdc:Bounds x="1970" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_majCandidature" bpmnElement="majCandidature"><omgdc:Bounds x="2110" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_notifierResultat" bpmnElement="notifierResultat"><omgdc:Bounds x="2250" y="205" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_acceptee" bpmnElement="gw_acceptee"><omgdc:Bounds x="2400" y="215" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="2370" y="267" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_creerStage" bpmnElement="creerStage"><omgdc:Bounds x="2365" y="335" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_majEtudiant" bpmnElement="majEtudiant"><omgdc:Bounds x="2525" y="335" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_k_fin" bpmnElement="k_fin"><omgdc:Bounds x="2640" y="222" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_fin" bpmnElement="gw_fin"><omgdc:Bounds x="2770" y="215" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="2740" y="267" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_fin_acceptee" bpmnElement="fin_acceptee"><omgdc:Bounds x="2880" y="160" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="2850" y="198" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_fin_refusee" bpmnElement="fin_refusee"><omgdc:Bounds x="2880" y="300" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="2850" y="338" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_err_controles" bpmnElement="err_controles"><omgdc:Bounds x="272" y="312" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="242" y="350" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_err_rejet" bpmnElement="err_rejet"><omgdc:Bounds x="767" y="432" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="737" y="470" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_err_transmission" bpmnElement="err_transmission"><omgdc:Bounds x="982" y="312" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="952" y="350" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_err_complement" bpmnElement="err_complement"><omgdc:Bounds x="1707" y="402" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="1677" y="440" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_err_cloture" bpmnElement="err_cloture"><omgdc:Bounds x="2032" y="402" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="2002" y="440" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_traiterIncident" bpmnElement="traiterIncident"><omgdc:Bounds x="1500" y="620" width="140" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_action" bpmnElement="gw_action"><omgdc:Bounds x="1545" y="740" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="1515" y="792" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_compenser" bpmnElement="compenser"><omgdc:Bounds x="1730" y="730" width="120" height="70"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_fin_abandonnee" bpmnElement="fin_abandonnee"><omgdc:Bounds x="1900" y="747" width="36" height="36"/><bpmndi:BPMNLabel><omgdc:Bounds x="1870" y="785" width="96" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_gw_route" bpmnElement="gw_route"><omgdc:Bounds x="1390" y="740" width="50" height="50"/><bpmndi:BPMNLabel><omgdc:Bounds x="1360" y="792" width="110" height="28"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="e_f_c1" bpmnElement="f_c1"><omgdi:waypoint x="166" y="240.0"/><omgdi:waypoint x="190" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_c2" bpmnElement="f_c2"><omgdi:waypoint x="310" y="240.0"/><omgdi:waypoint x="340" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_c3" bpmnElement="f_c3"><omgdi:waypoint x="460" y="240.0"/><omgdi:waypoint x="490" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_c4" bpmnElement="f_c4"><omgdi:waypoint x="610" y="240.0"/><omgdi:waypoint x="650" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_t1" bpmnElement="f_t1"><omgdi:waypoint x="916" y="240.0"/><omgdi:waypoint x="930" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_t2" bpmnElement="f_t2"><omgdi:waypoint x="1050" y="240.0"/><omgdi:waypoint x="1070" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_t3" bpmnElement="f_t3"><omgdi:waypoint x="1190" y="240.0"/><omgdi:waypoint x="1210" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_t4" bpmnElement="f_t4"><omgdi:waypoint x="1330" y="240.0"/><omgdi:waypoint x="1350" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_t5" bpmnElement="f_t5"><omgdi:waypoint x="1470" y="240.0"/><omgdi:waypoint x="1510" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k1" bpmnElement="f_k1"><omgdi:waypoint x="1956" y="240.0"/><omgdi:waypoint x="1970" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k2" bpmnElement="f_k2"><omgdi:waypoint x="2090" y="240.0"/><omgdi:waypoint x="2110" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k3" bpmnElement="f_k3"><omgdi:waypoint x="2230" y="240.0"/><omgdi:waypoint x="2250" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k4" bpmnElement="f_k4"><omgdi:waypoint x="2370" y="240.0"/><omgdi:waypoint x="2400" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k_ok" bpmnElement="f_k_ok"><omgdi:waypoint x="2425.0" y="265"/><omgdi:waypoint x="2425.0" y="335"/><bpmndi:BPMNLabel><omgdc:Bounds x="2432" y="290" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k_refus" bpmnElement="f_k_refus"><omgdi:waypoint x="2450" y="240.0"/><omgdi:waypoint x="2640" y="240.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="2530" y="222" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k5" bpmnElement="f_k5"><omgdi:waypoint x="2485" y="370.0"/><omgdi:waypoint x="2525" y="370.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_k6" bpmnElement="f_k6"><omgdi:waypoint x="2645" y="370"/><omgdi:waypoint x="2658" y="370"/><omgdi:waypoint x="2658" y="258"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_1" bpmnElement="f_1"><omgdi:waypoint x="76" y="240.0"/><omgdi:waypoint x="110" y="240.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="70" y="222" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_2" bpmnElement="f_2"><omgdi:waypoint x="710" y="240.0"/><omgdi:waypoint x="760" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_valide_oui" bpmnElement="f_valide_oui"><omgdi:waypoint x="810" y="240.0"/><omgdi:waypoint x="860" y="240.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="812" y="222" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_valide_non" bpmnElement="f_valide_non"><omgdi:waypoint x="785.0" y="265"/><omgdi:waypoint x="785.0" y="380"/><bpmndi:BPMNLabel><omgdc:Bounds x="792" y="320" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_rejet_fin" bpmnElement="f_rejet_fin"><omgdi:waypoint x="845" y="415.0"/><omgdi:waypoint x="905" y="415.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="850" y="397" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_3" bpmnElement="f_3"><omgdi:waypoint x="1570" y="240.0"/><omgdi:waypoint x="1620" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_4" bpmnElement="f_4"><omgdi:waypoint x="1750" y="240.0"/><omgdi:waypoint x="1800" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_annul1" bpmnElement="f_annul1"><omgdi:waypoint x="1685.0" y="187"/><omgdi:waypoint x="1685.0" y="140"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_annul2" bpmnElement="f_annul2"><omgdi:waypoint x="1745" y="105.0"/><omgdi:waypoint x="1785" y="105.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="1750" y="87" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_dec_comp" bpmnElement="f_dec_comp"><omgdi:waypoint x="1825" y="265"/><omgdi:waypoint x="1825" y="385"/><omgdi:waypoint x="1745" y="385"/><bpmndi:BPMNLabel><omgdc:Bounds x="1832" y="330" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_comp_retour" bpmnElement="f_comp_retour"><omgdi:waypoint x="1685" y="350"/><omgdi:waypoint x="1685" y="275"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_dec_fin" bpmnElement="f_dec_fin"><omgdi:waypoint x="1850" y="240.0"/><omgdi:waypoint x="1900" y="240.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="1850" y="225" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_5" bpmnElement="f_5"><omgdi:waypoint x="2720" y="240.0"/><omgdi:waypoint x="2770" y="240.0"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_fin_ok" bpmnElement="f_fin_ok"><omgdi:waypoint x="2795" y="215"/><omgdi:waypoint x="2795" y="178"/><omgdi:waypoint x="2880" y="178"/><bpmndi:BPMNLabel><omgdc:Bounds x="2805" y="160" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_fin_refus" bpmnElement="f_fin_refus"><omgdi:waypoint x="2795" y="265"/><omgdi:waypoint x="2795" y="318"/><omgdi:waypoint x="2880" y="318"/><bpmndi:BPMNLabel><omgdc:Bounds x="2805" y="322" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_e1" bpmnElement="f_e1"><omgdi:waypoint x="290" y="348"/><omgdi:waypoint x="290" y="660"/><omgdi:waypoint x="1500" y="660"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_e2" bpmnElement="f_e2"><omgdi:waypoint x="785" y="468"/><omgdi:waypoint x="785" y="660"/><omgdi:waypoint x="1500" y="660"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_e3" bpmnElement="f_e3"><omgdi:waypoint x="1000" y="348"/><omgdi:waypoint x="1000" y="590"/><omgdi:waypoint x="1570" y="590"/><omgdi:waypoint x="1570" y="620"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_e4" bpmnElement="f_e4"><omgdi:waypoint x="1725" y="438"/><omgdi:waypoint x="1725" y="660"/><omgdi:waypoint x="1640" y="660"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_e5" bpmnElement="f_e5"><omgdi:waypoint x="2050" y="438"/><omgdi:waypoint x="2050" y="660"/><omgdi:waypoint x="1640" y="660"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_i1" bpmnElement="f_i1"><omgdi:waypoint x="1570.0" y="700"/><omgdi:waypoint x="1570.0" y="740"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_abandon" bpmnElement="f_abandon"><omgdi:waypoint x="1595" y="765.0"/><omgdi:waypoint x="1730" y="765.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="1600" y="745" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_i2" bpmnElement="f_i2"><omgdi:waypoint x="1850" y="765.0"/><omgdi:waypoint x="1900" y="765.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="1850" y="747" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_relancer" bpmnElement="f_relancer"><omgdi:waypoint x="1545" y="765.0"/><omgdi:waypoint x="1440" y="765.0"/><bpmndi:BPMNLabel><omgdc:Bounds x="1465" y="745" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_r_controles" bpmnElement="f_r_controles"><omgdi:waypoint x="1390" y="765"/><omgdi:waypoint x="410" y="765"/><omgdi:waypoint x="410" y="330"/><bpmndi:BPMNLabel><omgdc:Bounds x="1300" y="770" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_r_rejet" bpmnElement="f_r_rejet"><omgdi:waypoint x="1415" y="790"/><omgdi:waypoint x="1415" y="820"/><omgdi:waypoint x="695" y="820"/><omgdi:waypoint x="695" y="415"/><omgdi:waypoint x="725" y="415"/><bpmndi:BPMNLabel><omgdc:Bounds x="1300" y="825" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_r_transmission" bpmnElement="f_r_transmission"><omgdi:waypoint x="1415" y="740"/><omgdi:waypoint x="1415" y="710"/><omgdi:waypoint x="1215" y="710"/><omgdi:waypoint x="1215" y="330"/><bpmndi:BPMNLabel><omgdc:Bounds x="1222" y="480" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_r_complement" bpmnElement="f_r_complement"><omgdi:waypoint x="1415" y="790"/><omgdi:waypoint x="1415" y="850"/><omgdi:waypoint x="1685" y="850"/><omgdi:waypoint x="1685" y="420"/><bpmndi:BPMNLabel><omgdc:Bounds x="1525" y="855" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_f_r_cloture" bpmnElement="f_r_cloture"><omgdi:waypoint x="1415" y="790"/><omgdi:waypoint x="1415" y="880"/><omgdi:waypoint x="2310" y="880"/><omgdi:waypoint x="2310" y="420"/><bpmndi:BPMNLabel><omgdc:Bounds x="1800" y="862" width="90" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

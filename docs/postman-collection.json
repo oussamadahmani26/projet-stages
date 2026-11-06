@@ -1,0 +1,2085 @@
+{
+  "info": {
+    "name": "Plateforme SOA - Gestion des stages",
+    "description": "À exécuter dans l'ordre, sur une base fraîchement initialisée (sql/schema.sql puis sql/data.sql).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{utilisateur}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{motDePasse}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "soapEtudiants",
+      "value": "http://127.0.0.1:8081/ws/etudiants"
+    },
+    {
+      "key": "soapEntreprises",
+      "value": "http://127.0.0.1:8082/ws/entreprises"
+    },
+    {
+      "key": "soapOffres",
+      "value": "http://127.0.0.1:8083/ws/offres"
+    },
+    {
+      "key": "restCandidatures",
+      "value": "http://127.0.0.1:8084/api/candidatures"
+    },
+    {
+      "key": "restNotifications",
+      "value": "http://127.0.0.1:8085/api/notifications"
+    },
+    {
+      "key": "restStages",
+      "value": "http://127.0.0.1:8086/api/stages"
+    },
+    {
+      "key": "facade",
+      "value": "http://127.0.0.1:8090/api"
+    },
+    {
+      "key": "utilisateur",
+      "value": "soa_client"
+    },
+    {
+      "key": "motDePasse",
+      "value": "soa_dev_password"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. SOAP Étudiants",
+      "item": [
+        {
+          "name": "Ajouter un étudiant",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:ajouterEtudiant><etudiant><matricule>PM-1</matricule><nom>Etudiant Postman</nom><filiere>Data Science</filiere><niveauEtudes>INE 2</niveauEtudes><email>postman@test.ma</email></etudiant></n:ajouterEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<statut>ACTIF</statut>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajouter un doublon (faute CONFLIT)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:ajouterEtudiant><etudiant><matricule>PM-1</matricule><nom>Etudiant Postman</nom><filiere>Data Science</filiere><niveauEtudes>INE 2</niveauEtudes><email>postman@test.ma</email></etudiant></n:ajouterEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<code>CONFLIT</code>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E-mail invalide (faute VALIDATION)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:ajouterEtudiant><etudiant><matricule>PM-2</matricule><nom>A</nom><filiere>F</filiere><niveauEtudes>INE 1</niveauEtudes><email>invalide</email></etudiant></n:ajouterEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<code>VALIDATION</code>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter un étudiant",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:consulterEtudiant><matricule>INE-2026-003</matricule></n:consulterEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Fatima Zahra\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Étudiant inconnu (faute INTROUVABLE)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:consulterEtudiant><matricule>INCONNU</matricule></n:consulterEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<code>INTROUVABLE</code>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les étudiants",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:listerEtudiants/></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"INE-2026-001\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier un étudiant",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:modifierEtudiant><etudiant><matricule>PM-1</matricule><nom>Nom Modifié</nom><filiere>Data Science</filiere><niveauEtudes>INE 2</niveauEtudes><email>postman@test.ma</email></etudiant></n:modifierEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Nom Modifié\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vérifier un étudiant suspendu",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:verifierEtudiant><matricule>INE-2026-005</matricule></n:verifierEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<eligible>false</eligible>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Changer le statut",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:changerStatutEtudiant><matricule>PM-1</matricule><statut>SUSPENDU</statut></n:changerStatutEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<statut>SUSPENDU</statut>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer un étudiant",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEtudiants}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/etudiants\"><soapenv:Body><n:supprimerEtudiant><matricule>PM-1</matricule></n:supprimerEtudiant></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. SOAP Entreprises",
+      "item": [
+        {
+          "name": "Ajouter une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:ajouterEntreprise><entreprise><nom>Postman SA</nom><secteurActivite>IT</secteurActivite><email>rh@postman.ma</email><responsableContact>Mme Test</responsableContact></entreprise></n:ajouterEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"idEntrepriseCreee\", pm.response.text().match(/<idEntreprise>(.*?)<\\/idEntreprise>/)[1]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:consulterEntreprise><idEntreprise>{{idEntrepriseCreee}}</idEntreprise></n:consulterEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Postman SA\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les entreprises",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:listerEntreprises/></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Bonitasoft\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:modifierEntreprise><entreprise><idEntreprise>{{idEntrepriseCreee}}</idEntreprise><nom>Postman SA</nom><secteurActivite>IT</secteurActivite><email>rh@postman.ma</email><responsableContact>M. Modifié</responsableContact></entreprise></n:modifierEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"M. Modifié\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Offres d'une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:consulterOffresEntreprise><idEntreprise>1</idEntreprise></n:consulterOffresEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<offre>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vérifier une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:verifierEntreprise><idEntreprise>1</idEntreprise></n:verifierEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<referencee>true</referencee>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer une entreprise avec offres (faute CONFLIT)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:supprimerEntreprise><idEntreprise>1</idEntreprise></n:supprimerEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<code>CONFLIT</code>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer une entreprise",
+          "request": {
+            "method": "POST",
+            "url": "{{soapEntreprises}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/entreprises\"><soapenv:Body><n:supprimerEntreprise><idEntreprise>{{idEntrepriseCreee}}</idEntreprise></n:supprimerEntreprise></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. SOAP Offres",
+      "item": [
+        {
+          "name": "Créer une offre",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:creerOffre><offre><idEntreprise>1</idEntreprise><titre>Offre Postman</titre><description>Description</description><competencesRequises>Java</competencesRequises><dureeMois>3</dureeMois><dateLimite>2030-01-31</dateLimite><placesDisponibles>2</placesDisponibles></offre></n:creerOffre></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<statut>ACTIVE</statut>\"));",
+                  "pm.collectionVariables.set(\"idOffreCreee\", pm.response.text().match(/<idOffre>(.*?)<\\/idOffre>/)[1]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Date limite passée (faute VALIDATION)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:creerOffre><offre><idEntreprise>1</idEntreprise><titre>Offre Postman</titre><description>Description</description><competencesRequises>Java</competencesRequises><dureeMois>3</dureeMois><dateLimite>2020-01-31</dateLimite><placesDisponibles>2</placesDisponibles></offre></n:creerOffre></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 500\", () => pm.response.to.have.status(500));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<code>VALIDATION</code>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter une offre",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:consulterOffre><idOffre>{{idOffreCreee}}</idOffre></n:consulterOffre></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Offre Postman\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les offres",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:listerOffres/></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<offre>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier une offre",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:modifierOffre><offre><idOffre>{{idOffreCreee}}</idOffre><statut>ACTIVE</statut><idEntreprise>1</idEntreprise><titre>Offre Modifiée</titre><description>Description</description><competencesRequises>Java</competencesRequises><dureeMois>3</dureeMois><dateLimite>2030-01-31</dateLimite><placesDisponibles>2</placesDisponibles></offre></n:modifierOffre></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Offre Modifiée\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vérifier la disponibilité (offre clôturée)",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:verifierDisponibilite><idOffre>6</idOffre></n:verifierDisponibilite></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<disponible>false</disponible>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vérifier la compatibilité",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:verifierCompatibilite><idOffre>1</idOffre><filiere>Innovation et AMOA</filiere><niveauEtudes>INE 2</niveauEtudes></n:verifierCompatibilite></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<compatible>true</compatible>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vérifier une incompatibilité",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:verifierCompatibilite><idOffre>1</idOffre><filiere>Data Science</filiere><niveauEtudes>INE 2</niveauEtudes></n:verifierCompatibilite></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<compatible>false</compatible>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Réserver une place",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:reserverPlace><idOffre>{{idOffreCreee}}</idOffre></n:reserverPlace></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"<reservee>true</reservee>\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Libérer une place",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:libererPlace><idOffre>{{idOffreCreee}}</idOffre></n:libererPlace></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer une offre",
+          "request": {
+            "method": "POST",
+            "url": "{{soapOffres}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:n=\"http://soa.inpt.ma/offres\"><soapenv:Body><n:supprimerOffre><idOffre>{{idOffreCreee}}</idOffre></n:supprimerOffre></soapenv:Body></soapenv:Envelope>"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. REST Candidatures",
+      "item": [
+        {
+          "name": "Déposer",
+          "request": {
+            "method": "POST",
+            "url": "{{restCandidatures}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEtudiant\": 4,\n  \"idOffre\": 5,\n  \"lettreMotivation\": \"Motivé\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json(); const o = Array.isArray(c) ? c[0] : c; pm.collectionVariables.set(\"idCandidature\", o.idCandidature);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Doublon",
+          "request": {
+            "method": "POST",
+            "url": "{{restCandidatures}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEtudiant\": 4,\n  \"idOffre\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Étudiant inconnu",
+          "request": {
+            "method": "POST",
+            "url": "{{restCandidatures}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEtudiant\": 9999,\n  \"idOffre\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Champ manquant",
+          "request": {
+            "method": "POST",
+            "url": "{{restCandidatures}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idOffre\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidatures d'un étudiant",
+          "request": {
+            "method": "GET",
+            "url": "{{restCandidatures}}?idEtudiant=4",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"idCandidature\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter",
+          "request": {
+            "method": "GET",
+            "url": "{{restCandidatures}}/{{idCandidature}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inexistante",
+          "request": {
+            "method": "GET",
+            "url": "{{restCandidatures}}/99999",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transition interdite",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restCandidatures}}/{{idCandidature}}/statut",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"ACCEPTEE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passer en évaluation",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restCandidatures}}/{{idCandidature}}/statut",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"EN_COURS_EVALUATION\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"EN_COURS_EVALUATION\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Annuler",
+          "request": {
+            "method": "DELETE",
+            "url": "{{restCandidatures}}/{{idCandidature}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redéposer après annulation",
+          "request": {
+            "method": "POST",
+            "url": "{{restCandidatures}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEtudiant\": 4,\n  \"idOffre\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Évaluer",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restCandidatures}}/{{idCandidature}}/statut",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"EN_COURS_EVALUATION\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accepter",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restCandidatures}}/{{idCandidature}}/statut",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"ACCEPTEE\",\n  \"motif\": \"Bon profil\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"ACCEPTEE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Annuler après décision",
+          "request": {
+            "method": "DELETE",
+            "url": "{{restCandidatures}}/{{idCandidature}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. REST Notifications",
+      "item": [
+        {
+          "name": "Envoyer",
+          "request": {
+            "method": "POST",
+            "url": "{{restNotifications}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DEMANDE_COMPLEMENT\",\n  \"destinataireType\": \"ETUDIANT\",\n  \"destinataireId\": 2,\n  \"destinataireEmail\": \"etudiant@test.ma\",\n  \"sujet\": \"Complément\",\n  \"message\": \"Merci d'envoyer votre CV.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"SIMULEE\"));",
+                  "const c = pm.response.json(); const o = Array.isArray(c) ? c[0] : c; pm.collectionVariables.set(\"idNotification\", o.idNotification);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Type inconnu",
+          "request": {
+            "method": "POST",
+            "url": "{{restNotifications}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"INCONNU\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister par destinataire",
+          "request": {
+            "method": "GET",
+            "url": "{{restNotifications}}?destinataireType=ETUDIANT&destinataireId=2",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"DEMANDE_COMPLEMENT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter",
+          "request": {
+            "method": "GET",
+            "url": "{{restNotifications}}/{{idNotification}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inexistante",
+          "request": {
+            "method": "GET",
+            "url": "{{restNotifications}}/99999",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rappels de date limite",
+          "request": {
+            "method": "POST",
+            "url": "{{restNotifications}}/rappels?joursAvant=7",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"rappelsEnvoyes\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. REST Stages",
+      "item": [
+        {
+          "name": "Dates incohérentes",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCandidature\": \"{{idCandidature}}\",\n  \"dateDebut\": \"2027-09-01\",\n  \"dateFin\": \"2027-03-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCandidature\": \"{{idCandidature}}\",\n  \"dateDebut\": \"2027-03-01\",\n  \"dateFin\": \"2027-09-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"PLANIFIE\"));",
+                  "const c = pm.response.json(); const o = Array.isArray(c) ? c[0] : c; pm.collectionVariables.set(\"idStage\", o.idStage);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Un seul stage par candidature",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCandidature\": \"{{idCandidature}}\",\n  \"dateDebut\": \"2027-03-01\",\n  \"dateFin\": \"2027-09-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter",
+          "request": {
+            "method": "GET",
+            "url": "{{restStages}}/{{idStage}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique d'un étudiant",
+          "request": {
+            "method": "GET",
+            "url": "{{restStages}}?idEtudiant=4",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"idStage\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Compte rendu avant le début",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}/{{idStage}}/comptes-rendus",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"periode\": \"Mars\",\n  \"contenu\": \"Texte\",\n  \"auteur\": \"Tuteur\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Démarrer le stage",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restStages}}/{{idStage}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"EN_COURS\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"EN_COURS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajouter un compte rendu",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}/{{idStage}}/comptes-rendus",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"periode\": \"Mars\",\n  \"contenu\": \"Avancement conforme\",\n  \"auteur\": \"Tuteur\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les comptes rendus",
+          "request": {
+            "method": "GET",
+            "url": "{{restStages}}/{{idStage}}/comptes-rendus",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"Avancement\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Note invalide",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}/{{idStage}}/evaluations",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": 25,\n  \"evaluateur\": \"Tuteur\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajouter une évaluation",
+          "request": {
+            "method": "POST",
+            "url": "{{restStages}}/{{idStage}}/evaluations",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": 16.5,\n  \"evaluateur\": \"Tuteur\",\n  \"commentaire\": \"Très bien\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les évaluations",
+          "request": {
+            "method": "GET",
+            "url": "{{restStages}}/{{idStage}}/evaluations",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"16.5\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transition interdite",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restStages}}/{{idStage}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"PLANIFIE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Connexion et processus BPMN",
+      "item": [
+        {
+          "name": "Sans session : refusé",
+          "request": {
+            "method": "GET",
+            "url": "{{facade}}/offres",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mauvais mot de passe",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/auth/connexion",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifiant\": \"responsable\",\n  \"motDePasse\": \"faux\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Connexion du responsable",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/auth/connexion",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifiant\": \"responsable\",\n  \"motDePasse\": \"responsable2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"RESPONSABLE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inscription : rôle réservé refusé",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/auth/inscription",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"RESPONSABLE\",\n  \"motDePasse\": \"motdepasse1\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rejet : étudiant suspendu",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/processus/candidatures",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matricule\": \"INE-2026-005\",\n  \"idOffre\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"REJETEE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rejet : offre clôturée",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/processus/candidatures",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matricule\": \"INE-2026-001\",\n  \"idOffre\": 6\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"REJETEE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Déposer une candidature",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/processus/candidatures",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matricule\": \"INE-2026-001\",\n  \"idOffre\": 1,\n  \"lettreMotivation\": \"Très motivé\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"EN_ATTENTE_DECISION\"));",
+                  "const c = pm.response.json(); const o = Array.isArray(c) ? c[0] : c; pm.collectionVariables.set(\"idProcessus\", o.idProcessus);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dossiers à traiter",
+          "request": {
+            "method": "GET",
+            "url": "{{facade}}/processus/taches?idEntreprise=1",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"idTache\"));",
+                  "const c = pm.response.json(); const o = Array.isArray(c) ? c[0] : c; pm.collectionVariables.set(\"idTache\", o.idTache);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Décision invalide",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/processus/taches/{{idTache}}/decision",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"PEUT_ETRE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accepter",
+          "request": {
+            "method": "POST",
+            "url": "{{facade}}/processus/taches/{{idTache}}/decision",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPTEE\",\n  \"motif\": \"Bon profil\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"\\\"etat\\\":\\\"ACCEPTEE\\\"\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Détail du processus",
+          "request": {
+            "method": "GET",
+            "url": "{{facade}}/processus/{{idProcessus}}",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"creerStage\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Incidents ouverts",
+          "request": {
+            "method": "GET",
+            "url": "{{facade}}/processus/incidents",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disponibilité des services",
+          "request": {
+            "method": "GET",
+            "url": "{{facade}}/sante",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Code HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contenu attendu\", () => pm.expect(pm.response.text()).to.include(\"REST Stages\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

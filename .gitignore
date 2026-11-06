@@ -1,0 +1,8 @@
+target/
+data/
+*.jks
+*.p12
+.logs/
+.idea/
+.vscode/
+*.iml
