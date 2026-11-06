@@ -3,7 +3,7 @@ USE gestion_stages;
 
 -- Insertion de 5 Étudiants (dont 2 en filière AMOA)
 INSERT INTO Etudiant (matricule, nom, filiere, niveau_etudes, email, telephone, statut) VALUES
-('INE-2026-001', 'Oussama Dahmani', 'Innovation et AMOA', 'INE 2', 'dahmani.oussama@ine.inpt.ac.ma', '+212600000001', 'ACTIF'),
+('INE-2026-001', 'Oussama Dahmani', 'Innovation et AMOA', 'INE 2', 'dahmani.oussama@ine.inpt.ac.ma', '+212642133295', 'ACTIF'),
 ('INE-2026-002', 'Jawad Chafik', 'Innovation et AMOA', 'INE 2', 'chafik.jawad@ine.inpt.ac.ma', '+212600000000', 'ACTIF'),
 ('INE-2026-003', 'Fatima Zahra', 'Ingénierie Logicielle', 'INE 3', 'fatima.zahra@ine.inpt.ac.ma', '+212611111111', 'ACTIF'),
 ('INE-2026-004', 'Reda Bouabid', 'Cybersécurité', 'INE 2', 'bouabid.reda@ine.inpt.ac.ma', '+212622222222', 'ACTIF'),
